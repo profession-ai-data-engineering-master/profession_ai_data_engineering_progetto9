@@ -54,8 +54,57 @@ Il job accetta in input un parametro `--coin` (es. `BTC` o `XMR`) e adatta dinam
 === Procedura Operativa: Creazione Glue Job
 Di seguito è riportata la procedura eseguita sulla AWS Console per configurare il job:
 
-1.  *Configurazione IAM:*
-    - Creazione di un ruolo IAM `GlueServiceRole-Crypto` con permessi di lettura/scrittura sui bucket S3 (`bronze`, `silver`, `gold`, `scripts`) e permessi di esecuzione per Glue.
+1.  *Configurazione IAM (Ruolo `GlueServiceRole-Crypto`):*
+    Per rispettare il principio del privilegio minimo, è stato configurato un ruolo IAM specifico seguendo questa procedura operativa:
+    - *Creazione Ruolo:*
+      1.  Dalla Console AWS, navigare in *IAM* > *Roles* > *Create role*.
+      2.  Selezionare _Trusted entity type_: *AWS service*.
+      3.  In _Use case_, scegliere *Glue*.
+      4.  Assegnare il nome `GlueServiceRole-Crypto` e procedere alla creazione.
+    - *Definizione Permessi:*
+      È stata adottata una strategia mista (Managed + Inline) per bilanciare semplicità e sicurezza:
+      - *Policy Managed:* Collegata la policy `AWSGlueServiceRole` per garantire l'accesso base alle API di Glue e la scrittura dei log su CloudWatch.
+      - *Inline Policy (S3):* Creata una policy custom per restringere strettamente l'accesso in lettura/scrittura ai soli bucket del progetto.
+      ```json
+      {
+          "Version": "2012-10-17",
+          "Statement": [
+              {
+                  "Effect": "Allow",
+                  "Action": [
+                      "s3:ListBucket",
+                      "s3:GetObject",
+                      "s3:PutObject",
+                      "s3:DeleteObject"
+                  ],
+                  "Resource": [
+                      "arn:aws:s3:::cryptodata-insights-bronze",
+                      "arn:aws:s3:::cryptodata-insights-bronze/*",
+                      "arn:aws:s3:::cryptodata-insights-silver",
+                      "arn:aws:s3:::cryptodata-insights-silver/*",
+                      "arn:aws:s3:::cryptodata-insights-gold",
+                      "arn:aws:s3:::cryptodata-insights-gold/*",
+                      "arn:aws:s3:::cryptodata-insights-scripts",
+                      "arn:aws:s3:::cryptodata-insights-scripts/*"
+                  ]
+              }
+          ]
+      }
+      ```
+    - *Trust Relationship:*
+      Verificato che il ruolo possa essere assunto dal servizio Glue:
+      ```json
+      {
+          "Version": "2012-10-17",
+          "Statement": [
+              {
+                  "Effect": "Allow",
+                  "Principal": { "Service": "glue.amazonaws.com" },
+                  "Action": "sts:AssumeRole"
+              }
+          ]
+      }
+      ```
 2.  *Creazione Job:*
     - Servizio: *AWS Glue* > *ETL jobs*.
     - Opzione: *Script editor* (Spark).
