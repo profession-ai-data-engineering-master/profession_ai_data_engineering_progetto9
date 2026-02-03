@@ -9,9 +9,9 @@ Prima di sviluppare la logica di trasformazione, è stata eseguita un'analisi st
 
 *Raw Data: Storico Prezzi (BTC_EUR / XMR_EUR)*
 - *Schema:* `"Date"`, `"Price"`, `"Open"`, `"High"`, `"Low"`, `"Vol."`, `"Change %"`.
-- *Formato Dati:*
-    - `Date`: Formato stringa "mm/dd/yyyy" (es. "03/12/2024").
-    - `Price`: Numerico con separatore di migliaia (virgola), es. "65,619.5".
+- *Formato Dati e Parsing:*
+    - `Date`: Formato stringa "mm/dd/yyyy", coerente con la logica di parsing implementata.
+    - `Price`: Formato numerico locale EN-US (virgola come separatore delle migliaia), normalizzato nello script prima del casting.
 - *Qualità del Dato:* Sono stati rilevati valori "sentinel" (`-1`) nella colonna `Price`, che indicano dati mancanti da gestire.
 
 *Raw Data: Google Trends*
@@ -27,6 +27,8 @@ Per massimizzare la manutenibilità del codice e ridurre la duplicazione, si è 
 Il job accetta in input un parametro `--coin` (es. `BTC` o `XMR`) e adatta dinamicamente i percorsi di lettura e scrittura.
 - *Vantaggi:* Unica codebase da mantenere; facilità di onboarding per nuove valute.
 - *Logica:* Lo script determina quali file leggere dal Bronze Bucket basandosi sul parametro fornito e indirizza l'output nelle cartelle corrispondenti del Silver e Gold Bucket.
+- *Consistenza Temporale:* La chiave di join `week_start` viene calcolata normalizzando le date tramite `date_trunc("week", ...)` sia per i prezzi che per i trend. Questo approccio assicura un allineamento temporale robusto e privo di ambiguità legate al calendario ISO.
+- *Integrità del Dato:* Il forward-fill sui prezzi viene applicato solo ai record con date valide, garantendo la correttezza della serie temporale. I valori di trend mancanti sono mantenuti `NULL` per preservare la distinzione tra assenza di dato e valore zero.
 
 === Procedura Operativa: Creazione Glue Job
 Di seguito è riportata la procedura eseguita sulla AWS Console per configurare il job:
@@ -40,7 +42,7 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
 3.  *Job Details:*
     - Name: `CryptoData-ETL-Generic`.
     - IAM Role: `GlueServiceRole-Crypto`.
-    - Worker Type: `G 1X` (sufficiente per la mole di dati).
+    - Worker Type: `G.1X` (sufficiente per la mole di dati).
     - Job parameters (valori di default per test):
         - `--coin`: `BTC`
         - `--bronze_bucket`: `s3://cryptodata-insights-bronze`
@@ -58,7 +60,7 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from pyspark.sql.functions import col, to_date, regexp_replace, avg, when, last, weekofyear, year
+from pyspark.sql.functions import col, to_date, regexp_replace, avg, when, last, lit, date_trunc
 from pyspark.sql.window import Window
 
 # 1. Recupero Parametri
@@ -87,15 +89,19 @@ current_files = files_map[COIN]
 # --- FUNZIONI DI SUPPORTO ---
 
 def read_csv(path):
-    return spark.read.option("header", "true").option("inferSchema", "true").csv(path)
+    # Riduzione dipendenza da inferSchema per maggiore stabilità
+    return spark.read.option("header", "true").option("inferSchema", "false").csv(path)
 
 def clean_price_data(df):
-    # Parsing Prezzo: Rimuovi virgola e converti in double
+    # Parsing Prezzo: Cast a string -> replace -> double
     df = df.withColumn("Price_Clean", 
-                       regexp_replace(col("Price"), ",", "").cast("double"))
+                       regexp_replace(col("Price").cast("string"), ",", "").cast("double"))
     
     # Parsing Data: Formato rilevato mm/dd/yyyy
     df = df.withColumn("Date_Clean", to_date(col("Date"), "MM/dd/yyyy"))
+
+    # Filtro data valida PRIMA del forward fill per stabilità
+    df = df.filter(col("Date_Clean").isNotNull())
     
     # Gestione missing values (-1): Sostituisci con NULL e applica Forward Fill
     w_ffill = Window.orderBy("Date_Clean").rowsBetween(Window.unboundedPreceding, 0)
@@ -106,18 +112,23 @@ def clean_price_data(df):
                    .withColumn("Price_Filled", 
                                last("Price_Null", ignorenulls=True).over(w_ffill))
     
+    # Aggiunta colonna COIN e calcolo chiave temporale settimanale per Join
     return df_cleaned.select(
         col("Date_Clean").alias("date"),
-        col("Price_Filled").alias("price")
-    ).filter(col("date").isNotNull())
+        col("Price_Filled").alias("price"),
+        lit(COIN).alias("coin"),
+        to_date(date_trunc("week", col("Date_Clean"))).alias("week_start") # Chiave di Join robusta
+    )
 
 def clean_trend_data(df):
     # Rename colonne dinamico (es "interesse bitcoin" -> "interest")
     trend_col = [c for c in df.columns if "interesse" in c.lower()][0]
     
+    # Normalizzazione week_start coerente con i prezzi
     return df.select(
-        to_date(col("Settimana"), "yyyy-MM-dd").alias("week_start"),
-        col(trend_col).cast("integer").alias("trend_score")
+        to_date(date_trunc("week", to_date(col("Settimana"), "yyyy-MM-dd"))).alias("week_start"),
+        col(trend_col).cast("integer").alias("trend_score"),
+        lit(COIN).alias("coin")
     )
 
 # --- PIPELINE ESECUZIONE ---
@@ -142,24 +153,18 @@ df_trend_silver.write.mode("overwrite").parquet(silver_path_trend)
 
 # 3. Gold Layer: Arricchimento
 # Calcolo Media Mobile 10 giorni
-w_avg = Window.orderBy("date").rowsBetween(-9, 0)
+w_avg = Window.partitionBy("coin").orderBy("date").rowsBetween(-9, 0)
 df_semigold = df_price_silver.withColumn("moving_avg_10d", avg("price").over(w_avg))
 
-# Preparazione Join: Estrai anno e settimana per joinare
-df_semigold = df_semigold.withColumn("year", year("date")) \
-                         .withColumn("week", weekofyear("date"))
-
-df_trend_silver = df_trend_silver.withColumn("year", year("week_start")) \
-                                 .withColumn("week", weekofyear("week_start"))
-
-# Join (Left Join per mantenere report giornaliero, arricchito col dato settimanale)
-df_gold = df_semigold.join(df_trend_silver, on=["year", "week"], how="left") \
-                     .drop("year", "week", "week_start") \
+# Join Temporale Robusto su week_start
+# Ogni giorno eredita il trend della settimana di appartenenza
+df_gold = df_semigold.join(df_trend_silver, on=["week_start", "coin"], how="left") \
+                     .drop("week_start") \
                      .orderBy("date")
 
-# Fill trend settimanale (lo stesso valore per tutta la settimana)
-w_trend_fill = Window.orderBy("date").rowsBetween(Window.unboundedPreceding, 0)
-df_gold = df_gold.withColumn("trend_score", last("trend_score", ignorenulls=True).over(w_trend_fill))
+# Gestione NULL nel trend
+# Manteniamo NULL se il dato di trend manca per quella settimana specifica (nessun fill con 0)
+# df_gold = df_gold.fillna(0, subset=["trend_score"])
 
 # Scrittura Gold
 gold_path = f"{GOLD_URI}/{COIN}/final_dataset"
@@ -169,14 +174,14 @@ job.commit()
 ```
 
 === Output Prodotti
-L'esecuzione del job popola i bucket S3 con i seguenti artefatti:
+L'esecuzione del job popola i bucket S3 con i seguenti artefatti, parametrizzati per valuta (`{coin}`, es. `BTC`, `XMR`):
 
 1.  *Silver Layer:*
-    - `s3://...-silver/BTC/price/`: Dataset prezzi pulito (Date, Price), formato Parquet.
-    - `s3://...-silver/BTC/trend/`: Dataset trend normalizzato (Week, Score), formato Parquet.
+    - `s3://...-silver/{coin}/price/`: Dataset prezzi pulito (colonne: `date`, `price`, `coin`, `week_start`).
+    - `s3://...-silver/{coin}/trend/`: Dataset trend normalizzato (colonne: `week_start`, `trend_score`, `coin`).
 2.  *Gold Layer:*
-    - `s3://...-gold/BTC/final_dataset/`: Tabella master analitica.
-    - Colonne finali: `date`, `price`, `moving_avg_10d`, `trend_score`.
+    - `s3://...-gold/{coin}/final_dataset/`: Tabella master analitica pronta per Redshift.
+    - Colonne finali: `date`, `price`, `coin`, `moving_avg_10d`, `trend_score`.
 
 // Screenshot 3
 #screenshot-placeholder(
