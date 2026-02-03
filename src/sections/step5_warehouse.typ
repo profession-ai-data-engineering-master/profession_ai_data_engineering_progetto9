@@ -1,6 +1,6 @@
 #import "../utils.typ": screenshot-placeholder
 
-== Step 2: Data Warehousing (Redshift)
+== Step 5: Data Warehousing (Redshift)
 Per l'analisi finale, è stato configurato un cluster Amazon Redshift (o Serverless workgroup). È stata definita la DDL per le tabelle finali che ospiteranno i dati unificati (`data`, `prezzo`, `trend`).
 
 // Screenshot 2

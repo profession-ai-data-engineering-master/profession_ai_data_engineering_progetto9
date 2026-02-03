@@ -47,10 +47,10 @@
 La seguente sezione descrive gli step operativi eseguiti sulla piattaforma AWS per realizzare l'infrastruttura.
 
 #include "sections/step1_storage.typ"
-#include "sections/step2_warehouse.typ"
-#include "sections/step3_etl.typ"
-#include "sections/step4_orchestration.typ"
-#include "sections/step5_execution.typ"
+#include "sections/step2_etl.typ"
+#include "sections/step3_orchestration.typ"
+#include "sections/step4_execution.typ"
+#include "sections/step5_warehouse.typ"
 #include "sections/step6_results.typ"
 
 #include "sections/conclusions.typ"
