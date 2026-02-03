@@ -118,7 +118,37 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
         - `--bronze_bucket`: `s3://cryptodata-insights-bronze`
         - `--silver_bucket`: `s3://cryptodata-insights-silver`
         - `--gold_bucket`: `s3://cryptodata-insights-gold`
-4.  *Deployment Script:* Lo script Python è stato salvato nel bucket `scripts` e referenziato nella configurazione del job.
+4.  *Gestione Script e Deployment:*
+    Per garantire il controllo delle versioni sul codice ETL, il bucket `s3://cryptodata-insights-scripts` è stato organizzato secondo una struttura gerarchica rigorosa.
+    - *Struttura S3:*
+      ```text
+      s3://cryptodata-insights-scripts/
+      └── glue/
+          └── etl/
+              ├── v1/
+              │   └── crypto_etl_job.py
+              ├── v2/
+              │   └── crypto_etl_job.py
+              └── latest/
+                  └── crypto_etl_job.py
+      ```
+      L'utilizzo di cartelle versionate (`v1`, `v2`...) permette di conservare lo storico delle modifiche, mentre la cartella `latest` funge da puntatore stabile per l'esecuzione produttiva.
+
+    - *Procedura di Aggiornamento (Checklist):*
+      1.  Modificare e testare localmente lo script Python.
+      2.  Caricare il nuovo file in una nuova cartella incrementale (es. `s3://.../glue/etl/v3/crypto_etl_job.py`).
+      3.  Copiare la nuova versione nella cartella `latest`, sovrascrivendo il file esistente.
+      4.  Se il path nel Glue Job punta a `latest`, l'aggiornamento è automatico alla successiva esecuzione.
+
+    - *Configurazione Job:*
+      Nel campo *Script path* del Glue Job, è stato impostato il percorso assoluto alla versione `latest`:
+      `s3://cryptodata-insights-scripts/glue/etl/latest/crypto_etl_job.py`
+      Questa configurazione disaccoppia il ciclo di vita del codice dalla definizione del job, facilitando eventuali rollback (basta ripristinare il file in `latest` da una versione precedente).
+
+    - *Best Practices Adottate:*
+      - Non sovrascrivere mai le cartelle numerate (`v1`, `v2`, etc.).
+      - Ogni versione corrisponde a una modifica logica significativa.
+      - Testare sempre una nuova versione copiandola in `latest` ed eseguendo il job con un parametro limitato (es. `--coin=BTC`) prima dell'esecuzione completa.
 
 === Script ETL PySpark
 Di seguito viene riportato il codice completo sviluppato per il job. Lo script gestisce l'intero ciclo di vita del dato: pulizia (Silver) e aggregazione (Gold).
