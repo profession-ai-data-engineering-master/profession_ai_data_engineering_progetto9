@@ -11,7 +11,10 @@
 #set heading(numbering: "1.")
 
 #let title = "Pipeline E2E AWS per l'Analisi di Criptovalute: Il caso CryptoData Insights"
-#let authors = ("Studente / Data Engineer")
+#let authors = [
+  Federico Vita \
+  Master in Data Engineering
+]
 #let date = datetime.today().display()
 
 // Title block
@@ -25,10 +28,12 @@
 // Indice (Table of Contents)
 #show outline.entry: it => {
   it
-  v(1pt, weak: true)
+  v(12pt, weak: true)
 }
 #outline(title: "Indice dei Contenuti", indent: auto)
 #v(2em)
+
+#pagebreak()
 
 // Two-column layout removed for better readability
 // #show: rest => columns(2, rest)
