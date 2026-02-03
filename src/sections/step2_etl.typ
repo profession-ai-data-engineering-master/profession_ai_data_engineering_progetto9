@@ -287,8 +287,7 @@ L'esecuzione del job popola i bucket S3 con i seguenti artefatti, parametrizzati
     - `s3://...-gold/{coin}/final_dataset/`: Tabella master analitica pronta per Redshift.
     - Colonne finali: `date`, `price`, `coin`, `moving_avg_10d`, `trend_score`.
 
-// Screenshot 3
-#screenshot-placeholder(
-  "Script PySpark del Glue Job con parsing dei CSV reali e logica ETL.",
-  "glue_job_logic.png"
+#figure(
+  image("../assets/glue_job_run_success.png", width: 100%),
+  caption: "Esecuzione del Glue Job `CryptoData-ETL-Generic` con stato `Succeeded`, a conferma della corretta configurazione del ruolo IAM, dei parametri di input e della logica ETL implementata."
 )
