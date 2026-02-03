@@ -3,10 +3,10 @@
 == Step 3: ETL Processing (AWS Glue)
 Sono stati sviluppati due job AWS Glue per processare parallelamente BTC e XMR.
 Ogni job esegue:
-1.  Lettura dal bucket `raw`.
+1.  Lettura dal *Bronze Bucket* (dati grezzi).
 2.  Handling dei nulli (prezzi a -1).
 3.  Calcolo media mobile (10 giorni).
-4.  Scrittura in formato Parquet nel bucket `silver`.
+4.  Scrittura in formato Parquet nel *Silver Bucket* (dati puliti).
 
 // Screenshot 3
 #screenshot-placeholder(
