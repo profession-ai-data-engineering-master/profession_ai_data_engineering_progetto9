@@ -55,16 +55,11 @@ Il job accetta in input un parametro `--coin` (es. `BTC` o `XMR`) e adatta dinam
 Di seguito è riportata la procedura eseguita sulla AWS Console per configurare il job:
 
 1.  *Configurazione IAM (Ruolo `GlueServiceRole-Crypto`):*
-    Per rispettare il principio del privilegio minimo, è stato configurato un ruolo IAM specifico seguendo questa procedura operativa:
-    - *Creazione Ruolo:*
-      1.  Dalla Console AWS, navigare in *IAM* > *Roles* > *Create role*.
-      2.  Selezionare _Trusted entity type_: *AWS service*.
-      3.  In _Use case_, scegliere *Glue*.
-      4.  Assegnare il nome `GlueServiceRole-Crypto` e procedere alla creazione.
-    - *Definizione Permessi:*
-      È stata adottata una strategia mista (Managed + Inline) per bilanciare semplicità e sicurezza:
-      - *Policy Managed:* Collegata la policy `AWSGlueServiceRole` per garantire l'accesso base alle API di Glue e la scrittura dei log su CloudWatch.
-      - *Inline Policy (S3):* Creata una policy custom per restringere strettamente l'accesso in lettura/scrittura ai soli bucket del progetto.
+    Per rispettare il principio del privilegio minimo, la configurazione è stata divisa in due fasi: creazione di una policy dedicata e successiva associazione al ruolo.
+
+    - *Fase 1: Creazione Policy S3 (Customer Managed)*
+      1.  Dalla Console AWS, navigare in *IAM* > *Policies* > *Create policy*.
+      2.  Nel tab *JSON*, inserire la seguente policy che limita l'accesso in lettura/scrittura esclusivamente ai bucket del progetto:
       ```json
       {
           "Version": "2012-10-17",
@@ -91,8 +86,17 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
           ]
       }
       ```
+      3.  Salvare la policy con il nome `CryptoData-S3-GlueAccess`.
+
+    - *Fase 2: Creazione Ruolo e Associazione Permessi*
+      1.  Navigare in *IAM* > *Roles* > *Create role* (Trusted entity: *AWS Service*, Use case: *Glue*).
+      2.  Nella sezione *Add permissions*, allegare le seguenti policy:
+          - *Policy Managed (AWS):* `AWSGlueServiceRole` (accesso base Glue e CloudWatch).
+          - *Policy Custom:* `CryptoData-S3-GlueAccess` (creata al punto precedente).
+      3.  Finalizzare la creazione con il nome `GlueServiceRole-Crypto`.
+
     - *Trust Relationship:*
-      Verificato che il ruolo possa essere assunto dal servizio Glue:
+      Verificare che il ruolo possieda la relazione di fiducia necessaria per essere assunto da Glue:
       ```json
       {
           "Version": "2012-10-17",
