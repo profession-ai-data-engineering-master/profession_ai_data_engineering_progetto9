@@ -5,21 +5,42 @@
 Il cuore della pipeline è rappresentato dalla fase di ETL (Extract, Transform, Load), responsabile della trasformazione dei dati grezzi in informazioni analitiche. Per questo progetto, è stato scelto *AWS Glue* come ambiente di esecuzione serverless per processare i flussi dati di Bitcoin e Monero.
 
 === Analisi Preliminare dei File RAW (CSV)
-Prima di sviluppare la logica di trasformazione, è stata eseguita un'analisi strutturale sui file CSV sorgente depositati nel *Bronze Bucket*.
+Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi puntuale su ciascuno dei quattro file CSV sorgente depositati nel *Bronze Bucket*, per identificarne schemi, formati e anomalie.
 
-*Raw Data: Storico Prezzi (BTC_EUR / XMR_EUR)*
-- *Schema:* `"Date"`, `"Price"`, `"Open"`, `"High"`, `"Low"`, `"Vol."`, `"Change %"`.
-- *Formato Dati e Parsing:*
-    - `Date`: Formato stringa "mm/dd/yyyy", coerente con la logica di parsing implementata.
-    - `Price`: Formato numerico locale EN-US (virgola come separatore delle migliaia), normalizzato nello script prima del casting.
-- *Qualità del Dato:* Sono stati rilevati valori "sentinel" (`-1`) nella colonna `Price`, che indicano dati mancanti da gestire.
+==== 1. File: `BTC_EUR_Historical_Data.csv`
+- *Origine:* Dati storici di mercato per Bitcoin (BTC/EUR).
+- *Granularità:* Giornaliera.
+- *Analisi delle Colonne:*
+  - `Date`: Stringa in formato "mm/dd/yyyy" (es. "03/12/2024"). *Utilizzo:* Chiave primaria temporale. Richiede parsing esplicito.
+  - `Price`: Stringa numerica con separatore di migliaia (es. "65,619.5" o "1,234.56"). *Utilizzo:* Metrica principale. Richiede rimozione virgole e cast a `double`.
+  - `Open`, `High`, `Low`: Stringhe numeriche. *Stato:* Ignorate (focus dell'analisi sul prezzo medio/chiusura).
+  - `Vol.`: Stringa con suffissi "K"/"M" (es. "0.19K"). *Stato:* Ignorata.
+  - `Change %`: Stringa percentuale (es. "-0.37%"). *Stato:* Ignorata.
+- *Qualità del Dato:* Rilevata presenza di valori sentinel `-1` nella colonna `Price`, indicativi di dati mancanti.
 
-*Raw Data: Google Trends*
-- *Schema:* `"Settimana"`, `"interesse [coin]"` (es. `"interesse bitcoin"`).
-- *Formato Dati:*
-    - `Settimana`: Formato standard ISO "yyyy-MM-dd" (es. "2019-03-17").
-    - `Interesse`: Intero tra 0 e 100.
-- *Granularità:* Settimanale (diverso dalla granularità giornaliera dei prezzi).
+==== 2. File: `XMR_EUR Kraken Historical Data.csv`
+- *Origine:* Dati storici di mercato per Monero (XMR/EUR).
+- *Granularità:* Giornaliera.
+- *Analisi delle Colonne:*
+  - Schema identico al file BTC: `Date`, `Price`, `Open`, `High`, `Low`, `Vol.`, `Change %`.
+  - Formato `Price`: Numerico EN-US ("133.290"). Richiede la stessa logica di pulizia.
+  - Colonne accessorie (`Open`...`Change %`): Presenti ma escluse dall'ETL.
+
+==== 3. File: `google_trend_bitcoin.csv`
+- *Origine:* Google Trends (Keyword: "Bitcoin").
+- *Granularità:* Settimanale (Indice lunedì-domenica).
+- *Analisi delle Colonne:*
+  - `Settimana`: Stringa ISO-8601 "yyyy-MM-dd" (es. "2019-03-17"). *Utilizzo:* Chiave temporale. Viene normalizzata a `week_start` per il join.
+  - `interesse bitcoin`: Intero (0-100). *Utilizzo:* Metrica di popolarità.
+- *Implicazioni ETL:* Il nome della colonna metrica contiene la keyword "bitcoin", richiedendo una logica di selezione dinamica della colonna target.
+
+==== 4. File: `google_trend_monero.csv`
+- *Origine:* Google Trends (Keyword: "Monero").
+- *Granularità:* Settimanale.
+- *Analisi delle Colonne:*
+  - `Settimana`: Stringa ISO-8601. *Analisi:* Formato coerente con il dataset Bitcoin.
+  - `Monero_interesse`: Intero (0-100). *Analisi:* Si nota una nomenclatura diversa rispetto al file Bitcoin (`Monero_interesse` vs `interesse bitcoin`).
+- *Implicazioni ETL:* La diversità nei nomi delle colonne (`interesse bitcoin` vs `Monero_interesse`) ha guidato l'implementazione di una funzione di lettura flessibile basata sulla sottostringa `"interesse"`.
 
 === Scelta Implementativa: Job Parametrico
 Per massimizzare la manutenibilità del codice e ridurre la duplicazione, si è optato per lo sviluppo di un *unico AWS Glue Job parametrico*, anziché creare script distinti per ogni criptovaluta.
