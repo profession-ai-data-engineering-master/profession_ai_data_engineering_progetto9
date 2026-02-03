@@ -7,7 +7,7 @@ Il cuore della pipeline è rappresentato dalla fase di ETL (Extract, Transform, 
 === Analisi Preliminare dei File RAW (CSV)
 Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi puntuale su ciascuno dei quattro file CSV sorgente depositati nel *Bronze Bucket*, per identificarne schemi, formati e anomalie.
 
-==== 1. File: `BTC_EUR_Historical_Data.csv`
+==== File: `BTC_EUR_Historical_Data.csv`
 - *Origine:* Dati storici di mercato per Bitcoin (BTC/EUR).
 - *Granularità:* Giornaliera.
 - *Analisi delle Colonne:*
@@ -18,7 +18,7 @@ Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi pu
   - `Change %`: Stringa percentuale (es. "-0.37%"). *Stato:* Ignorata.
 - *Qualità del Dato:* Rilevata presenza di valori sentinel `-1` nella colonna `Price`, indicativi di dati mancanti.
 
-==== 2. File: `XMR_EUR Kraken Historical Data.csv`
+==== File: `XMR_EUR Kraken Historical Data.csv`
 - *Origine:* Dati storici di mercato per Monero (XMR/EUR).
 - *Granularità:* Giornaliera.
 - *Analisi delle Colonne:*
@@ -26,7 +26,7 @@ Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi pu
   - Formato `Price`: Numerico EN-US ("133.290"). Richiede la stessa logica di pulizia.
   - Colonne accessorie (`Open`...`Change %`): Presenti ma escluse dall'ETL.
 
-==== 3. File: `google_trend_bitcoin.csv`
+==== File: `google_trend_bitcoin.csv`
 - *Origine:* Google Trends (Keyword: "Bitcoin").
 - *Granularità:* Settimanale (Indice lunedì-domenica).
 - *Analisi delle Colonne:*
@@ -34,7 +34,7 @@ Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi pu
   - `interesse bitcoin`: Intero (0-100). *Utilizzo:* Metrica di popolarità.
 - *Implicazioni ETL:* Il nome della colonna metrica contiene la keyword "bitcoin", richiedendo una logica di selezione dinamica della colonna target.
 
-==== 4. File: `google_trend_monero.csv`
+==== File: `google_trend_monero.csv`
 - *Origine:* Google Trends (Keyword: "Monero").
 - *Granularità:* Settimanale.
 - *Analisi delle Colonne:*
