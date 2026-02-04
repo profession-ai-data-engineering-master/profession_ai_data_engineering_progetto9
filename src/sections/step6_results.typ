@@ -159,7 +159,7 @@ Una volta aperta l'interfaccia di analisi, ho replicato le visualizzazioni previ
     -   *Y axis*: `price`.
     -   *Group/Color*: `coin`.
 
-=== 5. Pubblicazione e Validazione
+=== Pubblicazione e Validazione
 
 1.  Ho cliccato su *Share* -> *Publish dashboard*.
 2.  Ho assegnato il nome: `CryptoData Dashboard`.

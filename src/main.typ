@@ -52,5 +52,3 @@ La seguente sezione descrive gli step operativi eseguiti sulla piattaforma AWS p
 #include "sections/step4_execution.typ"
 #include "sections/step5_warehouse.typ"
 #include "sections/step6_results.typ"
-
-#include "sections/conclusions.typ"
