@@ -2,10 +2,10 @@
 
 == Step 2: ETL Processing (AWS Glue)
 
-Il cuore della pipeline è rappresentato dalla fase di ETL (Extract, Transform, Load), responsabile della trasformazione dei dati grezzi in informazioni analitiche. Per questo progetto, è stato scelto *AWS Glue* come ambiente di esecuzione serverless per processare i flussi dati di Bitcoin e Monero.
+Il cuore della pipeline che ho realizzato è rappresentato dalla fase di ETL (Extract, Transform, Load), responsabile della trasformazione dei dati grezzi in informazioni analitiche. Per questo progetto, ho scelto *AWS Glue* come ambiente di esecuzione serverless per processare i flussi dati di Bitcoin e Monero, garantendo scalabilità e gestione integrata delle risorse.
 
 === Analisi Preliminare dei File RAW (CSV)
-Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi puntuale su ciascuno dei quattro file CSV sorgente depositati nel *Bronze Bucket*, per identificarne schemi, formati e anomalie.
+Prima di sviluppare la logica di trasformazione, ho condotto un'analisi puntuale su ciascuno dei quattro file CSV sorgente depositati nel *Bronze Bucket*, per identificarne schemi, formati ed eventuali anomalie da gestire nel codice.
 
 ==== File: `BTC_EUR_Historical_Data.csv`
 - *Origine:* Dati storici di mercato per Bitcoin (BTC/EUR).
@@ -43,23 +43,23 @@ Prima di sviluppare la logica di trasformazione, è stata condotta un'analisi pu
 - *Implicazioni ETL:* La diversità nei nomi delle colonne (`interesse bitcoin` vs `Monero_interesse`) ha guidato l'implementazione di una funzione di lettura flessibile basata sulla sottostringa `"interesse"`.
 
 === Scelta Implementativa: Job Parametrico
-Per massimizzare la manutenibilità del codice e ridurre la duplicazione, si è optato per lo sviluppo di un *unico AWS Glue Job parametrico*, anziché creare script distinti per ogni criptovaluta.
+Per massimizzare la manutenibilità del codice e ridurre la duplicazione, ho optato per lo sviluppo di un *unico AWS Glue Job parametrico*, scartando l'idea di creare script distinti per ogni criptovaluta.
 
-Il job accetta in input un parametro `--coin` (es. `BTC` o `XMR`) e adatta dinamicamente i percorsi di lettura e scrittura.
-- *Vantaggi:* Unica codebase da mantenere; facilità di onboarding per nuove valute.
-- *Logica:* Lo script determina quali file leggere dal Bronze Bucket basandosi sul parametro fornito e indirizza l'output nelle cartelle corrispondenti del Silver e Gold Bucket.
-- *Consistenza Temporale:* La chiave di join `week_start` viene calcolata normalizzando le date tramite `date_trunc("week", ...)` sia per i prezzi che per i trend. Questo approccio assicura un allineamento temporale robusto e privo di ambiguità legate al calendario ISO.
-- *Integrità del Dato:* Il forward-fill sui prezzi viene applicato solo ai record con date valide, garantendo la correttezza della serie temporale. I valori di trend mancanti sono mantenuti `NULL` per preservare la distinzione tra assenza di dato e valore zero.
+Ho progettato il job affinché accetti in input un parametro `--coin` (es. `BTC` o `XMR`) e adatti dinamicamente i percorsi di lettura e scrittura.
+- *Vantaggi:* Questa scelta mi permette di mantenere un'unica codebase e facilita l'onboarding di nuove valute in futuro.
+- *Logica:* Ho programmato lo script per determinare quali file leggere dal Bronze Bucket basandosi sul parametro fornito e per indirizzare l'output nelle cartelle corrispondenti del Silver e Gold Bucket.
+- *Consistenza Temporale:* Ho calcolato la chiave di join `week_start` normalizzando le date tramite `date_trunc("week", ...)` sia per i prezzi che per i trend. Questo approccio mi assicura un allineamento temporale robusto.
+- *Integrità del Dato:* Ho deciso di applicare il forward-fill sui prezzi solo ai record con date valide. Inoltre, mantengo i valori di trend mancanti come `NULL` per preservare la distinzione semantica tra assenza di dato e valore zero.
 
 === Procedura Operativa: Creazione Glue Job
-Di seguito è riportata la procedura eseguita sulla AWS Console per configurare il job:
+Di seguito descrivo la procedura che ho eseguito sulla AWS Console per configurare il job:
 
 1.  *Configurazione IAM (Ruolo `GlueServiceRole-Crypto`):*
-    Per rispettare il principio del privilegio minimo, la configurazione è stata divisa in due fasi: creazione di una policy dedicata e successiva associazione al ruolo.
+    Per rispettare il principio del privilegio minimo, ho diviso la configurazione in due fasi: creazione di una policy dedicata e successiva associazione al ruolo.
 
     - *Fase 1: Creazione Policy S3 (Customer Managed)*
-      1.  Dalla Console AWS, navigare in *IAM* > *Policies* > *Create policy*.
-      2.  Nel tab *JSON*, inserire la seguente policy che limita l'accesso in lettura/scrittura esclusivamente ai bucket del progetto:
+      1.  Dalla Console AWS, ho navigato in *IAM* > *Policies* > *Create policy*.
+      2.  Nel tab *JSON*, ho inserito la seguente policy per limitare l'accesso in lettura/scrittura esclusivamente ai bucket del progetto:
       ```json
       {
           "Version": "2012-10-17",
@@ -86,17 +86,17 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
           ]
       }
       ```
-      3.  Salvare la policy con il nome `CryptoData-S3-GlueAccess`.
+      3.  Ho salvato la policy con il nome `CryptoData-S3-GlueAccess`.
 
     - *Fase 2: Creazione Ruolo e Associazione Permessi*
-      1.  Navigare in *IAM* > *Roles* > *Create role* (Trusted entity: *AWS Service*, Use case: *Glue*).
-      2.  Nella sezione *Add permissions*, allegare le seguenti policy:
-          - *Policy Managed (AWS):* `AWSGlueServiceRole` (accesso base Glue e CloudWatch).
-          - *Policy Custom:* `CryptoData-S3-GlueAccess` (creata al punto precedente).
-      3.  Finalizzare la creazione con il nome `GlueServiceRole-Crypto`.
+      1.  Sono andato in *IAM* > *Roles* > *Create role* (selezionando *AWS Service* e Use case *Glue*).
+      2.  Nella sezione *Add permissions*, ho allegato:
+          - *Policy Managed (AWS):* `AWSGlueServiceRole` (per accesso base Glue e CloudWatch).
+          - *Policy Custom:* `CryptoData-S3-GlueAccess` (creata da me al punto precedente).
+      3.  Ho finalizzato la creazione con il nome `GlueServiceRole-Crypto`.
 
     - *Trust Relationship:*
-      Verificare che il ruolo possieda la relazione di fiducia necessaria per essere assunto da Glue:
+      Ho verificato che il ruolo possedesse la relazione di fiducia necessaria per essere assunto da Glue:
       ```json
       {
           "Version": "2012-10-17",
@@ -110,20 +110,19 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
       }
       ```
 2.  *Creazione Job:*
-    - Servizio: *AWS Glue* > *ETL jobs*.
-    - Opzione: *Script editor* (Spark).
-    - Engine: Spark (Python/PySpark).
+    - Ho selezionato il servizio *AWS Glue* > *ETL jobs*.
+    - Ho scelto l'opzione *Script editor* (Spark) con engine Python/PySpark.
 3.  *Job Details:*
     - Name: `CryptoData-ETL-Generic`.
     - IAM Role: `GlueServiceRole-Crypto`.
-    - Worker Type: `G.1X` (sufficiente per la mole di dati).
-    - Job parameters (valori di default per test):
+    - Worker Type: Ho selezionato `G.1X` (ritenendolo sufficiente per la mole di dati).
+    - Job parameters (impostati come default per i test):
         - `--coin`: `BTC`
         - `--bronze_bucket`: `s3://cryptodata-insights-bronze`
         - `--silver_bucket`: `s3://cryptodata-insights-silver`
         - `--gold_bucket`: `s3://cryptodata-insights-gold`
 4.  *Gestione Script e Deployment:*
-    Per garantire il controllo delle versioni sul codice ETL, il bucket `s3://cryptodata-insights-scripts` è stato organizzato secondo una struttura gerarchica rigorosa.
+    Per garantire un rigoroso controllo delle versioni sul codice ETL, ho organizzato il bucket `s3://cryptodata-insights-scripts` secondo una precisa struttura gerarchica.
     - *Struttura S3:*
       ```text
       s3://cryptodata-insights-scripts/
@@ -136,39 +135,37 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
               └── latest/
                   └── crypto_etl_job.py
       ```
-      L'utilizzo di cartelle versionate (`v1`, `v2`...) permette di conservare lo storico delle modifiche, mentre la cartella `latest` funge da puntatore stabile per l'esecuzione produttiva.
+      L'utilizzo di cartelle versionate (`v1`, `v2`...) mi permette di conservare lo storico delle modifiche, mentre ho deciso di usare la cartella `latest` come puntatore stabile per l'esecuzione produttiva.
 
     - *Procedura di Aggiornamento (Checklist):*
-      1.  Modificare e testare localmente lo script Python.
-      2.  Caricare il nuovo file in una nuova cartella incrementale (es. `s3://.../glue/etl/v3/crypto_etl_job.py`).
-      3.  Copiare la nuova versione nella cartella `latest`, sovrascrivendo il file esistente.
-      4.  Se il path nel Glue Job punta a `latest`, l'aggiornamento è automatico alla successiva esecuzione.
+      1.  Modifico e testo localmente lo script Python.
+      2.  Carico il nuovo file in una nuova cartella incrementale (es. `s3://.../glue/etl/v3/crypto_etl_job.py`).
+      3.  Copio la nuova versione nella cartella `latest`, sovrascrivendo il file esistente.
+      4.  Poiché il Glue Job punta a `latest`, l'aggiornamento sarà automatico alla successiva esecuzione.
 
     - *Configurazione Job:*
-      Nel campo *Script path* del Glue Job, è stato impostato il percorso assoluto alla versione `latest`:
+      Nel campo *Script path* del Glue Job, ho impostato il percorso assoluto alla versione `latest`:
       `s3://cryptodata-insights-scripts/glue/etl/latest/crypto_etl_job.py`
-      Questa configurazione disaccoppia il ciclo di vita del codice dalla definizione del job, facilitando eventuali rollback (basta ripristinare il file in `latest` da una versione precedente).
+      Questa configurazione mi permette di disaccoppiare il ciclo di vita del codice dalla definizione del job.
 
-    - *Best Practices Adottate:*
-      - Non sovrascrivere mai le cartelle numerate (`v1`, `v2`, etc.).
+    - *Best Practices che ho adottato:*
+      - Non sovrascrivo mai le cartelle numerate (`v1`, `v2`, etc.).
       - Ogni versione corrisponde a una modifica logica significativa.
-      - Testare sempre una nuova versione copiandola in `latest` ed eseguendo il job con un parametro limitato (es. `--coin=BTC`) prima dell'esecuzione completa.
+      - Testo sempre una nuova versione copiandola in `latest` ed eseguendo il job con un parametro limitato prima dell'esecuzione completa.
 
 === Gestione Concorrenza del Job (Maximum concurrent runs)
-Essendo il job parametrico, la pipeline di orchestrazione avvia due esecuzioni parallele per processare simultaneamente i flussi BTC e XMR. È quindi fondamentale configurare Glue per accettare 2 run contemporanee dello stesso job.
+Essendo il job parametrico, la pipeline di orchestrazione avvia due esecuzioni parallele per processare simultaneamente i flussi BTC e XMR. Di conseguenza, ho dovuto configurare Glue per accettare 2 run contemporanee dello stesso job.
 
 - AWS Console -> *AWS Glue* -> *ETL jobs*
-- Aprire il job *`CryptoData-ETL-Generic`*
-- Click *Edit*
-- Nella sezione *Job details / Advanced properties / Concurrency* (usare la voce presente in console) trovare il campo:
-  *Maximum concurrent runs*
-- Impostare valore *2*
-- Click *Save*
+- Ho aperto il job *`CryptoData-ETL-Generic`* e cliccato su *Edit*
+- Nella sezione *Job details / Advanced properties / Concurrency*, ho impostato il campo:
+  *Maximum concurrent runs* a valore *2*
+- Ho salvato le modifiche.
 
-Questa impostazione è necessaria per l'orchestrazione in parallelo in Step Functions e previene l'errore `ConcurrentRunsExceededException`.
+Ho ritenuto questa impostazione necessaria per abilitare l'orchestrazione in parallelo in Step Functions e prevenire l'errore `ConcurrentRunsExceededException`.
 
 === Script ETL PySpark
-Di seguito viene riportato il codice completo sviluppato per il job. Lo script gestisce l'intero ciclo di vita del dato: pulizia (Silver) e aggregazione (Gold).
+Di seguito riporto il codice completo che ho sviluppato per il job. Lo script gestisce l'intero ciclo di vita del dato: pulizia (Silver) e aggregazione (Gold).
 
 ```python
 import sys
@@ -291,7 +288,7 @@ job.commit()
 ```
 
 === Output Prodotti
-L'esecuzione del job popola i bucket S3 con i seguenti artefatti, parametrizzati per valuta (`{coin}`, es. `BTC`, `XMR`):
+L'esecuzione del job che ho configurato popola i bucket S3 con i seguenti artefatti, parametrizzati per valuta (`{coin}`, es. `BTC`, `XMR`):
 
 1.  *Silver Layer:*
     - `s3://...-silver/{coin}/price/`: Dataset prezzi pulito (colonne: `date`, `price`, `coin`, `week_start`).

@@ -1,10 +1,10 @@
 #import "../utils.typ": screenshot-placeholder
 
 == Step 4: Esecuzione e Monitoraggio
-La pipeline è stata avviata ed è stato verificato il corretto completamento di tutti gli step attraverso il pannello di controllo della console AWS, che fornisce feedback immediato sullo stato dell'orchestrazione.
+Dopo aver completato la configurazione, ho avviato la pipeline e ne ho verificato il corretto completamento attraverso il pannello di controllo della console AWS, ottenendo un feedback immediato sullo stato dell'orchestrazione.
 
 === Monitoraggio dell’Orchestrazione
-L’esecuzione della pipeline è stata monitorata tramite le viste di esecuzione fornite da AWS Step Functions, che consentono di osservare lo stato dei singoli task, il parallelismo effettivo e l’esito finale della State Machine.
+Ho monitorato l'esecuzione della pipeline sfruttando le viste dettagliate fornite da AWS Step Functions. Questo mi ha permesso di osservare in tempo reale lo stato dei singoli task, confermare l'effettivo parallelismo dei job e validare l'esito finale della State Machine.
 
 #figure(
   image("../assets/step_functions_graph_execution_success.png", width: 100%),
@@ -22,4 +22,4 @@ L’esecuzione della pipeline è stata monitorata tramite le viste di esecuzione
 )
 
 === Nota sul Logging
-In questa fase il monitoraggio si concentra sull’orchestrazione della pipeline. I log applicativi dettagliati dei job ETL sono disponibili separatamente all’interno di AWS Glue e CloudWatch Logs, ma non sono oggetto delle schermate riportate in questo step, che mira a validare esclusivamente il flusso di controllo.
+In questa fase ho concentrato l'attività di monitoraggio esclusivamente sull'orchestrazione della pipeline. I log applicativi dettagliati dei job ETL restano disponibili separatamente all'interno di AWS Glue e CloudWatch Logs, ma ho scelto di non includerli in questo step per focalizzare l'attenzione sulla validazione del flusso di controllo.

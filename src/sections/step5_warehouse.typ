@@ -1,12 +1,11 @@
 == Step 5: Data Warehousing (Redshift)
 
-In questa fase configuriamo *Amazon Redshift Serverless* per centralizzare i dati elaborati (Gold Layer) e renderli disponibili per query analitiche e dashboarding. Utilizzeremo il *Redshift Query Editor v2* per creare lo schema del database e caricare i file Parquet da S3.
+In questa fase ho configurato *Amazon Redshift Serverless* con l'obiettivo di centralizzare i dati elaborati (Gold Layer) e renderli disponibili per query analitiche e dashboarding. Ho utilizzato il *Redshift Query Editor v2* per definire lo schema del database e per importare i file Parquet residenti su S3.
 
 === Configurazione IAM per Redshift (Policy e Ruolo)
-Redshift necessita di permessi per leggere i file dal bucket S3. Creiamo una Policy e un Ruolo dedicati.
+Poiché Redshift necessita di permessi espliciti per leggere i file dal bucket S3, ho provveduto a creare una Policy e un Ruolo dedicati.
 
-1. Andare nella console *IAM* -> *Policies* -> *Create policy*.
-2. Selezionare l'editor *JSON* e incollare la seguente policy (sostituire `<ACCOUNT_ID>` se necessario, o usare `*` con cautela):
+1.  Dalla console *IAM* -> *Policies* -> *Create policy*, ho aperto l'editor *JSON* e ho incollato la seguente policy (avendo cura di gestire correttamente l'account ID):
 ```json
 {
     "Version": "2012-10-17",
@@ -25,28 +24,25 @@ Redshift necessita di permessi per leggere i file dal bucket S3. Creiamo una Pol
     ]
 }
 ```
-3. Nominare la policy `CryptoData-Redshift-S3Access` e salvare.
-4. Andare su *Roles* -> *Create role*.
-5. Trusted entity type: *AWS Service*. Service or use case: *Redshift*. Selezionare *Redshift - Customizable* (o use-case standard per Serverless).
-6. Nello step "Add permissions", cercare e selezionare la policy appena creata `CryptoData-Redshift-S3Access`.
-7. Nominare il ruolo `CryptoData-Redshift-Role` e creare. Copiare l'*ARN* del ruolo (es. `arn:aws:iam::123456789012:role/CryptoData-Redshift-Role`) da usare successivamente.
+2.  Ho salvato la policy con il nome `CryptoData-Redshift-S3Access`.
+3.  Successivamente, in *Roles* -> *Create role*, ho selezionato *AWS Service* con use case *Redshift - Customizable* (adatto all'ambiente Serverless).
+4.  Nello step "Add permissions", ho cercato e selezionato la policy `CryptoData-Redshift-S3Access` appena creata.
+5.  Ho finalizzato la creazione assegnando il nome `CryptoData-Redshift-Role`. Ho quindi preso nota dell'*ARN* del ruolo (es. `arn:aws:iam::123456789012:role/CryptoData-Redshift-Role`) per utilizzarlo nelle fasi successive.
 
 === Creazione Redshift Serverless (Namespace e Workgroup)
-Utilizziamo la modalità Serverless per evitare la gestione di cluster fissi.
+Ho optato per la modalità Serverless per evitare la gestione e i costi fissi di un cluster provisioned.
 
-1. Dalla console AWS, cercare *Amazon Redshift* e selezionare nel menu a sinistra *Redshift Serverless*.
-2. Cliccare su *Create workgroup* (che creerà anche un namespace se è il primo avvio).
-3. *Workgroup configuration*:
-   - Workgroup name: `cryptodata-workgroup`.
-   - Capacity (RPUs): impostare il minimo (es. 8 RPU) per limitare i costi nell'ambiente di laboratorio.
-   - Network: scegliere la *VPC di default* e le subnets predefinite. Assicurarsi che il Security Group permetta il traffico necessario (o usare accesso "Publicly accessible" solo se strettamente necessario per client esterni, per il Query Editor v2 basta l'accesso console).
-4. *Namespace configuration*:
-   - Namespace name: `cryptodata-namespace`.
-   - Admin user credentials: Username `admin`, `qAb&5;J9%7`.
-5. *Permissions*:
-   - Cliccare su "Manage IAM roles" -> "Associate IAM roles".
-   - Selezionare `CryptoData-Redshift-Role` creato in precedenza.
-6. Cliccare *Create* e attendere che lo stato diventi _Available_.
+1.  Dalla console AWS ho selezionato *Redshift Serverless*.
+2.  Ho avviato la creazione cliccando su *Create workgroup*, che ha generato contestualmente anche il namespace necessario.
+3.  Ho configurato il Workgroup come segue:
+    - Workgroup name: `cryptodata-workgroup`.
+    - Capacity (RPUs): ho impostato il minimo (es. 8 RPU) per contenere i costi.
+    - Network: ho mantenuto la *VPC di default* e le relative subnet, assicurandomi che il Security Group permettesse il traffico necessario per l'accesso tramite console.
+4.  Ho configurato il Namespace:
+    - Namespace name: `cryptodata-namespace`.
+    - Admin user credentials: Username `admin`.
+5.  Nella sezione *Permissions*, tramite "Manage IAM roles" -> "Associate IAM roles", ho associato il ruolo `CryptoData-Redshift-Role` creato in precedenza.
+6.  Ho cliccato su *Create* e atteso che lo stato diventasse _Available_.
 
 #figure(
   image("../assets/redshift_serverless_namespace_workgroup.png", width: 100%),
@@ -54,15 +50,15 @@ Utilizziamo la modalità Serverless per evitare la gestione di cluster fissi.
 )
 
 === Creazione Schema e Tabelle (Query Editor v2)
-Utilizziamo l'editor SQL integrato nel browser.
+Per interagire con il database, ho utilizzato l'editor SQL integrato nel browser.
 
-1. Cliccare su *Query Editor v2* dal menu Redshift.
-2. Collegarsi al database (`dev`) usando le credenziali admin impostate nel Namespace.
-3. Creare uno schema dedicato per il progetto:
+1.  Ho aperto il *Query Editor v2* dal menu Redshift.
+2.  Mi sono connesso al database `dev` utilizzando le credenziali admin impostate nel Namespace.
+3.  Ho creato uno schema dedicato per il progetto:
 ```sql
 CREATE SCHEMA cryptodata;
 ```
-4. Creare la tabella unificata per i dati di mercato. Usiamo `SORTKEY` sulla data per ottimizzare le query temporali.
+4.  Ho definito la tabella unificata per i dati di mercato, impostando una `SORTKEY` sulla colonna `date` per ottimizzare le performance delle query temporali:
 
 ```sql
 CREATE TABLE cryptodata.crypto_market (
@@ -76,9 +72,9 @@ SORTKEY(date);
 ```
 
 === Caricamento Dati (COPY da S3)
-Per importare i file Parquet generati dal Glue Job ("Gold layer"), utilizziamo il comando `COPY`. Questo comando è efficiente e parallelo.
+Per importare i file Parquet generati dal Glue Job ("Gold layer"), ho utilizzato il comando `COPY`, sfruttandone l'efficienza e la capacità di parallelismo.
 
-Eseguire il comando seguente (sostituendo l'ARN del ruolo IAM):
+Ho eseguito i seguenti comandi SQL (inserendo l'ARN del ruolo IAM precedentemente creato):
 
 ```sql
 -- Caricamento dati Bitcoin
@@ -94,10 +90,10 @@ IAM_ROLE 'arn:aws:iam::607374883457:role/CryptoData-Redshift-Role'
 FORMAT AS PARQUET;
 ```
 
-_Nota_: Se i dataset sono partizionati correttamente, Redshift leggerà automaticamente tutti i file `.parquet` nella cartella specificata.
+_Nota_: Grazie alla corretta partizione dei dataset, Redshift ha letto automaticamente tutti i file `.parquet` presenti nelle cartelle specificate.
 
 === Validazione
-Verifichiamo che i dati siano stati caricati correttamente con alcune query di controllo.
+Infine, ho verificato che i dati fossero stati caricati correttamente eseguendo alcune query di controllo per confermare la completezza e la coerenza del dataset.
 
 ```sql
 -- Conteggio totale righe
