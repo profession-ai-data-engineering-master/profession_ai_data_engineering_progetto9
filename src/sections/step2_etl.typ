@@ -154,6 +154,19 @@ Di seguito è riportata la procedura eseguita sulla AWS Console per configurare 
       - Ogni versione corrisponde a una modifica logica significativa.
       - Testare sempre una nuova versione copiandola in `latest` ed eseguendo il job con un parametro limitato (es. `--coin=BTC`) prima dell'esecuzione completa.
 
+=== Gestione Concorrenza del Job (Maximum concurrent runs)
+Essendo il job parametrico, la pipeline di orchestrazione avvia due esecuzioni parallele per processare simultaneamente i flussi BTC e XMR. È quindi fondamentale configurare Glue per accettare 2 run contemporanee dello stesso job.
+
+- AWS Console -> *AWS Glue* -> *ETL jobs*
+- Aprire il job *`CryptoData-ETL-Generic`*
+- Click *Edit*
+- Nella sezione *Job details / Advanced properties / Concurrency* (usare la voce presente in console) trovare il campo:
+  *Maximum concurrent runs*
+- Impostare valore *2*
+- Click *Save*
+
+Questa impostazione è necessaria per l'orchestrazione in parallelo in Step Functions e previene l'errore `ConcurrentRunsExceededException`.
+
 === Script ETL PySpark
 Di seguito viene riportato il codice completo sviluppato per il job. Lo script gestisce l'intero ciclo di vita del dato: pulizia (Silver) e aggregazione (Gold).
 
