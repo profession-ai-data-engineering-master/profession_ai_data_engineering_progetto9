@@ -192,11 +192,11 @@ Di seguito riporto gli screenshot delle dashboard realizzate in Amazon QuickSigh
 )
 
 #figure(
-  image("../assets/sum_of_price_and_sum_of_moving_avg_10d_by_date_xmr.png"),
+  image("../assets/sum_of_price_and_sum_of_trend_score_by_date_btc.png"),
   caption: [
-    Analisi temporale di Monero (XMR): andamento del prezzo confrontato con la media mobile a 10 giorni.
-    La visualizzazione evidenzia una dinamica più irregolare rispetto a Bitcoin, con variazioni di prezzo più brusche
-    e una media mobile che segue il trend generale attenuando la rumorosità giornaliera.
+    Correlazione temporale Bitcoin (BTC): confronto tra prezzo e interesse di ricerca su Google.
+    Il trend score raggiunge valori più elevati e frequenti rispetto a Monero, riflettendo la maggiore
+    esposizione mediatica di Bitcoin e una correlazione più marcata con le fasi di rialzo del prezzo.
   ],
 )
 

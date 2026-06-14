@@ -80,13 +80,13 @@ Ho eseguito i seguenti comandi SQL (inserendo l'ARN del ruolo IAM precedentement
 -- Caricamento dati Bitcoin
 COPY cryptodata.crypto_market (coin, date, price, moving_avg_10d, trend_score)
 FROM 's3://cryptodata-insights-gold/BTC/final_dataset/'
-IAM_ROLE 'arn:aws:iam::607374883457:role/CryptoData-Redshift-Role'
+IAM_ROLE 'arn:aws:iam::123456789012:role/CryptoData-Redshift-Role'
 FORMAT AS PARQUET;
 
 -- Caricamento dati Monero
 COPY cryptodata.crypto_market(coin, date, price, moving_avg_10d, trend_score)
 FROM 's3://cryptodata-insights-gold/XMR/final_dataset/'
-IAM_ROLE 'arn:aws:iam::607374883457:role/CryptoData-Redshift-Role'
+IAM_ROLE 'arn:aws:iam::123456789012:role/CryptoData-Redshift-Role'
 FORMAT AS PARQUET;
 ```
 

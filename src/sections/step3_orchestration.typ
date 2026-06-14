@@ -25,15 +25,15 @@ Questa policy autorizza esplicitamente l'avvio e il monitoraggio del job Glue sp
       "Sid": "GlueStartAndMonitor",
       "Effect": "Allow",
       "Action": ["glue:StartJobRun", "glue:GetJobRun"],
-      "Resource": "arn:aws:glue:eu-central-1:607374883457:job/CryptoData-ETL-Generic"
+      "Resource": "arn:aws:glue:eu-central-1:123456789012:job/CryptoData-ETL-Generic"
     },
     {
       "Sid": "CloudWatchLogsWrite",
       "Effect": "Allow",
       "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
       "Resource": [
-        "arn:aws:logs:eu-central-1:607374883457:log-group:/aws/states/*",
-        "arn:aws:logs:eu-central-1:607374883457:log-group:/aws/states/*:*"
+        "arn:aws:logs:eu-central-1:123456789012:log-group:/aws/states/*",
+        "arn:aws:logs:eu-central-1:123456789012:log-group:/aws/states/*:*"
       ]
     }
   ]
